@@ -3,3 +3,4 @@ __pycache__/
 *_merged.srt
 *_dummy.srt
 output.srt
+.venv/

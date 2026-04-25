@@ -73,10 +73,13 @@ def convert_kanji_numbers(text):
     return "".join(result)
 
 
-def postprocess(text):
+def postprocess(text, replacements=None):
     text = remove_punct(text)
     text = convert_kanji_numbers(text)
     text = text.replace(" ", "").replace("\u3000", "")
+    if replacements:
+        for src, dst in replacements.items():
+            text = text.replace(src, dst)
     return text
 
 
@@ -108,7 +111,7 @@ def should_merge(prev_text, next_text):
     return False
 
 
-def merge_subtitles(input_path):
+def merge_subtitles(input_path, replacements=None):
     with open(input_path, encoding="utf-8") as f:
         subs = list(srt.parse(f.read()))
 
@@ -134,7 +137,7 @@ def merge_subtitles(input_path):
             index=len(merged) + 1,
             start=current_start,
             end=current_end,
-            content=postprocess(current_text),
+            content=postprocess(current_text, replacements),
         ))
 
     extend_timestamps(merged)
@@ -198,10 +201,24 @@ if __name__ == "__main__":
     for a in args:
         if a.startswith("--gap="):
             gap_sec = float(a.split("=", 1)[1])
+
+    replacements = {}
+    i_arg = 0
+    new_args = []
+    while i_arg < len(args):
+        if args[i_arg] == "--replace" and i_arg + 1 < len(args):
+            k, _, v = args[i_arg + 1].partition("=")
+            replacements[k] = v
+            i_arg += 2
+        else:
+            new_args.append(args[i_arg])
+            i_arg += 1
+    args = new_args
+
     args = [a for a in args if a not in ("--preview", "--dummy") and not a.startswith("--gap=")]
 
     if len(args) == 0:
-        print("使い方: python merge_srt.py input.srt [output.srt] [--preview] [--dummy]", file=sys.stderr)
+        print("使い方: python merge_srt.py input.srt [output.srt] [--preview] [--dummy] [--replace 検索語=置換後]", file=sys.stderr)
         sys.exit(1)
 
     input_path = args[0]
@@ -213,7 +230,7 @@ if __name__ == "__main__":
         suffix = "_dummy" if dummy else "_merged"
         output_path = base + suffix + ext
 
-    result = dummy_convert(input_path, gap_sec=gap_sec) if dummy else merge_subtitles(input_path)
+    result = dummy_convert(input_path, gap_sec=gap_sec) if dummy else merge_subtitles(input_path, replacements=replacements)
 
     if preview:
         print("[プレビューモード] 先頭30ブロックを表示（保存しません）")
