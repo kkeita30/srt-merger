@@ -1,0 +1,4 @@
+streamlit
+fugashi
+unidic-lite
+srt
