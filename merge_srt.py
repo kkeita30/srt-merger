@@ -6,8 +6,19 @@ tagger = fugashi.Tagger()
 
 PUNCT_REMOVE = set("、。，．")
 
+SENTENCE_ENDINGS = [
+    "です", "ます", "だ", "である", "でした", "ました",
+    "ません", "ですね", "ますね", "ですよ", "ますよ",
+    "だった", "であった", "ております", "おります", "ございます",
+    "ですか", "ますか", "だろう", "でしょう", "でしょうか",
+]
+
 _KANJI_DIGIT = {"一":1,"二":2,"三":3,"四":4,"五":5,"六":6,"七":7,"八":8,"九":9,"零":0,"〇":0}
 _KANJI_UNIT  = {"十":10,"百":100,"千":1000}
+
+
+def is_sentence_end(text):
+    return any(text.endswith(e) for e in SENTENCE_ENDINGS)
 
 
 def remove_punct(text):
@@ -133,11 +144,33 @@ def merge_subtitles(input_path, replacements=None):
             else:
                 break  # マージ不要なら終了
 
+        # postprocessを適用して整形
+        current_text = postprocess(current_text, replacements)
+
+        # 整形後テキストに対して追加マージ（途中切れ検出 + 短いブロック結合）
+        while i < len(subs):
+            next_raw = subs[i].content.strip()
+            next_processed = postprocess(next_raw, replacements)
+
+            if should_merge(current_text, next_processed):
+                current_text += next_processed
+                current_end = subs[i].end
+                i += 1
+                continue
+
+            if len(current_text) <= 10 and not is_sentence_end(current_text):
+                current_text += next_processed
+                current_end = subs[i].end
+                i += 1
+                continue
+
+            break
+
         merged.append(srt.Subtitle(
             index=len(merged) + 1,
             start=current_start,
             end=current_end,
-            content=postprocess(current_text, replacements),
+            content=current_text,
         ))
 
     extend_timestamps(merged)
